@@ -20,7 +20,6 @@ import assert from "node:assert";
    - Add cleanup logic.
    - Improve error handling.
    - Move functions to a separate helper.
-   - Move test constants to a separate mocks file.
 */
 
 interface World extends IWorldOptions {
