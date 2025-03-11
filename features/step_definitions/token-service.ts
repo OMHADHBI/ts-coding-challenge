@@ -34,34 +34,16 @@ setDefaultTimeout(60 * 1000);
    - Refactor global token variables into the World object.
 */
 
+let tokens: (TokenId | any)[] = [];
+
 interface World extends IWorldOptions {
-  firstAccount?: AccountId;
-  secondAccount?: AccountId;
-  thirdAccount?: AccountId;
-  fourthAccount?: AccountId;
-  firstAccountPrivateKey?: PrivateKey;
-  secondAccountPrivateKey?: PrivateKey;
-  thirdAccountPrivateKey?: PrivateKey;
-  fourthAccountPrivateKey?: PrivateKey;
+  accounts: (AccountId | undefined)[];
+  privateKeys: (PrivateKey | undefined)[];
 }
 
-let token1: any;
-let token2: any;
-let token3: any;
-let token4: any;
-
 Before(function (this: World) {
-  // Reset accounts
-  this.firstAccount = undefined;
-  this.secondAccount = undefined;
-  this.thirdAccount = undefined;
-  this.fourthAccount = undefined;
-
-  // Reset private keys
-  this.firstAccountPrivateKey = undefined;
-  this.secondAccountPrivateKey = undefined;
-  this.thirdAccountPrivateKey = undefined;
-  this.fourthAccountPrivateKey = undefined;
+  this.accounts = [];
+  this.privateKeys = [];
 });
 
 const client = Client.forTestnet();
@@ -206,22 +188,22 @@ Given(
       client,
       initialBalanceHbar * 2
     );
-    this.firstAccount = accountId;
-    this.firstAccountPrivateKey = privateKey;
-    const actualBalance = await getHbarBalance(client, this.firstAccount);
+    this.accounts[1] = accountId;
+    this.privateKeys[1] = privateKey;
+    const actualBalance = await getHbarBalance(client, this.accounts[1]);
     assert.ok(actualBalance > initialBalanceHbar);
   }
 );
 
 When(/^I create a token named Test Token \(HTT\)$/, async function () {
-  token1 = await createToken(client, {
+  tokens[1] = await createToken(client, {
     name: "Test Token",
     symbol: "HTT",
     supply: 1000,
     decimals: 2,
     treasury: mainAccount,
-    treasuryPrivateKey: this.firstAccountPrivateKey,
-    adminPrivateKey: this.firstAccountPrivateKey,
+    treasuryPrivateKey: this.privateKeys[1],
+    adminPrivateKey: this.privateKeys[1],
     fixedSupply: false,
   });
 });
@@ -231,7 +213,7 @@ Then(
   async function (expectedName: string) {
     //https://docs.hedera.com/hedera/sdks-and-apis/sdks/token-service/get-token-info
     const tokenInfo = await new TokenInfoQuery()
-      .setTokenId(token1)
+      .setTokenId(tokens[1])
       .execute(client);
     const actualName = tokenInfo.name;
 
@@ -243,7 +225,7 @@ Then(
   /^The token has the symbol "([^"]*)"$/,
   async function (expectedSymbol: string) {
     const tokenInfo = await new TokenInfoQuery()
-      .setTokenId(token1)
+      .setTokenId(tokens[1])
       .execute(client);
     const actualSymbol = tokenInfo.symbol;
 
@@ -255,7 +237,7 @@ Then(
   /^The token has (\d+) decimals$/,
   async function (expectedDecimals: number) {
     const tokenInfo = await new TokenInfoQuery()
-      .setTokenId(token1)
+      .setTokenId(tokens[1])
       .execute(client);
     const actualDecimals = tokenInfo.decimals;
 
@@ -265,7 +247,7 @@ Then(
 
 Then(/^The token is owned by the account$/, async function () {
   const tokenInfo = await new TokenInfoQuery()
-    .setTokenId(token1)
+    .setTokenId(tokens[1])
     .execute(client);
   const actualOwner = tokenInfo.treasuryAccountId;
 
@@ -277,11 +259,11 @@ Then(
   async function (amount: number) {
     //https://docs.hedera.com/hedera/sdks-and-apis/sdks/token-service/mint-a-token
     const mintTx = new TokenMintTransaction()
-      .setTokenId(token1)
+      .setTokenId(tokens[1])
       .setAmount(amount)
       .freezeWith(client);
 
-    const signTx = await mintTx.sign(this.firstAccountPrivateKey);
+    const signTx = await mintTx.sign(this.privateKeys[1]);
     const txResponse = await signTx.execute(client);
     const receipt = await txResponse.getReceipt(client);
     const transactionStatus = receipt.status;
@@ -293,13 +275,13 @@ Then(
 When(
   /^I create a fixed supply token named Test Token \(HTT\) with (\d+) tokens$/,
   async function (supply: number) {
-    token2 = await createToken(client, {
+    tokens[2] = await createToken(client, {
       name: "Test Token",
       symbol: "HTT",
       supply: supply,
-      treasury: this.firstAccount,
-      treasuryPrivateKey: this.firstAccountPrivateKey,
-      adminPrivateKey: this.firstAccountPrivateKey,
+      treasury: this.accounts[1],
+      treasuryPrivateKey: this.privateKeys[1],
+      adminPrivateKey: this.privateKeys[1],
       fixedSupply: true,
     });
   }
@@ -309,7 +291,7 @@ Then(
   /^The total supply of the token is (\d+)$/,
   async function (expectedTotalSupply: number) {
     const tokenInfo = await new TokenInfoQuery()
-      .setTokenId(token2)
+      .setTokenId(tokens[2])
       .execute(client);
     const totalSupply = tokenInfo.totalSupply;
     const actualTotalSupply = totalSupply.toNumber();
@@ -320,11 +302,11 @@ Then(
 Then(/^An attempt to mint tokens fails$/, async function () {
   try {
     const mintTx = new TokenMintTransaction()
-      .setTokenId(token2)
+      .setTokenId(tokens[2])
       .setAmount(1000)
       .freezeWith(client);
 
-    const signTx = await mintTx.sign(this.firstAccountPrivateKey);
+    const signTx = await mintTx.sign(this.privateKeys[1]);
     await signTx.execute(client);
   } catch (error) {
     assert.ok(error);
@@ -338,23 +320,23 @@ Given(
       client,
       initialBalanceHbar
     );
-    this.firstAccount = accountId;
-    this.firstAccountPrivateKey = privateKey;
-    const actualBalance = await getHbarBalance(client, this.firstAccount);
+    this.accounts[1] = accountId;
+    this.privateKeys[1] = privateKey;
+    const actualBalance = await getHbarBalance(client, this.accounts[1]);
     assert.strictEqual(actualBalance, initialBalanceHbar);
   }
 );
 
 Given(/^A second Hedera account$/, async function () {
   const { accountId, privateKey } = await createTestAccount(client, 100);
-  this.secondAccount = accountId;
-  this.secondAccountPrivateKey = privateKey;
+  this.accounts[2] = accountId;
+  this.privateKeys[2] = privateKey;
 });
 
 Given(
   /^A token named Test Token \(HTT\) with (\d+) tokens$/,
   async function (supply: number) {
-    token3 = await createToken(client, {
+    tokens[3] = await createToken(client, {
       name: "Test Token",
       symbol: "HTT",
       supply: supply,
@@ -371,25 +353,25 @@ Given(
   async function (initialBalanceHtt: number) {
     await safeAssociateAccount(
       client,
-      this.firstAccount,
-      this.firstAccountPrivateKey,
-      token3
+      this.accounts[1],
+      this.privateKeys[1],
+      tokens[3]
     );
     const currentBalance = await getTokenBalance(
       client,
-      this.firstAccount,
-      token3
+      this.accounts[1],
+      tokens[3]
     );
     if (currentBalance === 0) {
       await transferTokens(
         client,
-        token3,
+        tokens[3],
         { accountId: mainAccount, privateKey: mainAccountPrivateKey },
-        this.firstAccount,
+        this.accounts[1],
         initialBalanceHtt
       );
     }
-    const balance = await getTokenBalance(client, this.firstAccount, token3);
+    const balance = await getTokenBalance(client, this.accounts[1], tokens[3]);
     assert.strictEqual(balance, initialBalanceHtt);
   }
 );
@@ -399,25 +381,25 @@ Given(
   async function (initialBalanceHtt) {
     await safeAssociateAccount(
       client,
-      this.secondAccount,
-      this.secondAccountPrivateKey,
-      token3
+      this.accounts[2],
+      this.privateKeys[2],
+      tokens[3]
     );
     const currentBalance = await getTokenBalance(
       client,
-      this.secondAccount,
-      token3
+      this.accounts[2],
+      tokens[3]
     );
     if (currentBalance === 0) {
       await transferTokens(
         client,
-        token3,
+        tokens[3],
         { accountId: mainAccount, privateKey: mainAccountPrivateKey },
-        this.secondAccount,
+        this.accounts[2],
         initialBalanceHtt
       );
     }
-    const balance = await getTokenBalance(client, this.secondAccount, token3);
+    const balance = await getTokenBalance(client, this.accounts[2], tokens[3]);
     assert.strictEqual(balance, initialBalanceHtt);
   }
 );
@@ -426,17 +408,15 @@ When(
   /^The first account creates a transaction to transfer (\d+) HTT tokens to the second account$/,
   async function (amountHtt: number) {
     const transferTx = await new TransferTransaction()
-      .addTokenTransfer(token3, this.firstAccount, -amountHtt)
-      .addTokenTransfer(token3, this.secondAccount, amountHtt)
+      .addTokenTransfer(tokens[3], this.accounts[1], -amountHtt)
+      .addTokenTransfer(tokens[3], this.accounts[2], amountHtt)
       .freezeWith(client);
-    this.signTransferTx = await transferTx.sign(this.firstAccountPrivateKey);
+    this.signTransferTx = await transferTx.sign(this.privateKeys[1]);
   }
 );
 
 When(/^The first account submits the transaction$/, async function () {
-  const signTransferTx = await this.signTransferTx.sign(
-    this.firstAccountPrivateKey
-  );
+  const signTransferTx = await this.signTransferTx.sign(this.privateKeys[1]);
   const transferTxResponse = await signTransferTx.execute(client);
   await transferTxResponse.getReceipt(client);
 });
@@ -444,35 +424,26 @@ When(/^The first account submits the transaction$/, async function () {
 When(
   /^The second account creates a transaction to transfer (\d+) HTT tokens to the first account$/,
   async function (amountHtt) {
-    const txId = TransactionId.generate(this.firstAccount);
+    const txId = TransactionId.generate(this.accounts[1]);
     const transferTx = await new TransferTransaction()
       .setTransactionId(txId)
-      .addTokenTransfer(token3, this.secondAccount, -amountHtt)
-      .addTokenTransfer(token3, this.firstAccount, amountHtt)
+      .addTokenTransfer(tokens[3], this.accounts[2], -amountHtt)
+      .addTokenTransfer(tokens[3], this.accounts[1], amountHtt)
       .freezeWith(client);
-    this.signTransferTx = await transferTx.sign(this.secondAccountPrivateKey);
-    this.firstAccountHbarBalanceBeforeTransfer = await getHbarBalance(
-      client,
-      this.firstAccount
-    );
+    this.signTransferTx = await transferTx.sign(this.privateKeys[2]);
+    this.balanceBeforeTransfer = await getHbarBalance(client, this.accounts[1]);
   }
 );
 
 Then(/^The first account has paid for the transaction fee$/, async function () {
-  const firstAccountHbarBalanceAfterTransfer = await getHbarBalance(
-    client,
-    this.firstAccount
-  );
-  assert.ok(
-    firstAccountHbarBalanceAfterTransfer <
-      this.firstAccountHbarBalanceBeforeTransfer
-  );
+  const balanceAfterTransfer = await getHbarBalance(client, this.accounts[1]);
+  assert.ok(balanceAfterTransfer < this.balanceBeforeTransfer);
 });
 
 Given(
   /^A first hedera account with more than (\d+) hbar and (\d+) HTT tokens$/,
   async function (initialBalanceHbar, initialBalanceHtt) {
-    token4 = await createToken(client, {
+    tokens[4] = await createToken(client, {
       name: "Test Token",
       symbol: "HTT",
       supply: 1000,
@@ -487,29 +458,26 @@ Given(
       client,
       initialBalanceHbar * 2
     );
-    this.firstAccount = accountId;
-    this.firstAccountPrivateKey = privateKey;
+    this.accounts[1] = accountId;
+    this.privateKeys[1] = privateKey;
 
-    await associateTokens(
-      client,
-      this.firstAccount,
-      this.firstAccountPrivateKey,
-      [token4]
-    );
+    await associateTokens(client, this.accounts[1], this.privateKeys[1], [
+      tokens[4],
+    ]);
 
     await transferTokens(
       client,
-      token4,
+      tokens[4],
       { accountId: mainAccount, privateKey: mainAccountPrivateKey },
-      this.firstAccount,
+      this.accounts[1],
       initialBalanceHtt
     );
 
-    const actualHbarBalance = await getHbarBalance(client, this.firstAccount);
+    const actualHbarBalance = await getHbarBalance(client, this.accounts[1]);
     const actualHttBalance = await getTokenBalance(
       client,
-      this.firstAccount,
-      token4
+      this.accounts[1],
+      tokens[4]
     );
 
     assert.ok(actualHbarBalance >= initialBalanceHbar);
@@ -524,29 +492,26 @@ Given(
       client,
       initialBalanceHbar
     );
-    this.secondAccount = accountId;
-    this.secondAccountPrivateKey = privateKey;
+    this.accounts[2] = accountId;
+    this.privateKeys[2] = privateKey;
 
-    await associateTokens(
-      client,
-      this.secondAccount,
-      this.secondAccountPrivateKey,
-      [token4]
-    );
+    await associateTokens(client, this.accounts[2], this.privateKeys[2], [
+      tokens[4],
+    ]);
 
     await transferTokens(
       client,
-      token4,
+      tokens[4],
       { accountId: mainAccount, privateKey: mainAccountPrivateKey },
-      this.secondAccount,
+      this.accounts[2],
       initialBalanceHtt
     );
 
-    const actualHbarBalance = await getHbarBalance(client, this.secondAccount);
+    const actualHbarBalance = await getHbarBalance(client, this.accounts[2]);
     const actualHttBalance = await getTokenBalance(
       client,
-      this.secondAccount,
-      token4
+      this.accounts[2],
+      tokens[4]
     );
 
     assert.strictEqual(actualHbarBalance, initialBalanceHbar);
@@ -561,29 +526,26 @@ Given(
       client,
       initialBalanceHbar
     );
-    this.thirdAccount = accountId;
-    this.thirdAccountPrivateKey = privateKey;
+    this.accounts[3] = accountId;
+    this.privateKeys[3] = privateKey;
 
-    await associateTokens(
-      client,
-      this.thirdAccount,
-      this.thirdAccountPrivateKey,
-      [token4]
-    );
+    await associateTokens(client, this.accounts[3], this.privateKeys[3], [
+      tokens[4],
+    ]);
 
     await transferTokens(
       client,
-      token4,
+      tokens[4],
       { accountId: mainAccount, privateKey: mainAccountPrivateKey },
-      this.thirdAccount,
+      this.accounts[3],
       initialBalanceHtt
     );
 
-    const actualHbarBalance = await getHbarBalance(client, this.thirdAccount);
+    const actualHbarBalance = await getHbarBalance(client, this.accounts[3]);
     const actualHttBalance = await getTokenBalance(
       client,
-      this.thirdAccount,
-      token4
+      this.accounts[3],
+      tokens[4]
     );
 
     assert.strictEqual(actualHbarBalance, initialBalanceHbar);
@@ -597,29 +559,26 @@ Given(
       client,
       initialBalanceHbar
     );
-    this.fourthAccount = accountId;
-    this.fourthAccountPrivateKey = privateKey;
+    this.accounts[4] = accountId;
+    this.privateKeys[4] = privateKey;
 
-    await associateTokens(
-      client,
-      this.fourthAccount,
-      this.fourthAccountPrivateKey,
-      [token4]
-    );
+    await associateTokens(client, this.accounts[4], this.privateKeys[4], [
+      tokens[4],
+    ]);
 
     await transferTokens(
       client,
-      token4,
+      tokens[4],
       { accountId: mainAccount, privateKey: mainAccountPrivateKey },
-      this.fourthAccount,
+      this.accounts[4],
       initialBalanceHtt
     );
 
-    const actualHbarBalance = await getHbarBalance(client, this.fourthAccount);
+    const actualHbarBalance = await getHbarBalance(client, this.accounts[4]);
     const actualHttBalance = await getTokenBalance(
       client,
-      this.fourthAccount,
-      token4
+      this.accounts[4],
+      tokens[4]
     );
 
     assert.strictEqual(actualHbarBalance, initialBalanceHbar);
@@ -630,15 +589,15 @@ When(
   /^A transaction is created to transfer (\d+) HTT tokens out of the first and second account and (\d+) HTT tokens into the third account and (\d+) HTT tokens into the fourth account$/,
   async function (amountHtt1, amountHtt2, amountHtt3) {
     const transferTx = await new TransferTransaction()
-      .addTokenTransfer(token4, this.firstAccount, -amountHtt1)
-      .addTokenTransfer(token4, this.secondAccount, -amountHtt1)
-      .addTokenTransfer(token4, this.thirdAccount, amountHtt2)
-      .addTokenTransfer(token4, this.fourthAccount, amountHtt3)
+      .addTokenTransfer(tokens[4], this.accounts[1], -amountHtt1)
+      .addTokenTransfer(tokens[4], this.accounts[2], -amountHtt1)
+      .addTokenTransfer(tokens[4], this.accounts[3], amountHtt2)
+      .addTokenTransfer(tokens[4], this.accounts[4], amountHtt3)
       .freezeWith(client);
 
     this.signTransferTx = await (
-      await transferTx.sign(this.firstAccountPrivateKey)
-    ).sign(this.secondAccountPrivateKey);
+      await transferTx.sign(this.privateKeys[1])
+    ).sign(this.privateKeys[2]);
   }
 );
 Then(
@@ -646,8 +605,8 @@ Then(
   async function (expectedHttBalance) {
     const actualBalance = await getTokenBalance(
       client,
-      this.thirdAccount,
-      token4
+      this.accounts[3],
+      tokens[4]
     );
     assert.strictEqual(actualBalance, expectedHttBalance);
   }
@@ -657,8 +616,8 @@ Then(
   async function (expectedHttBalance) {
     const actualBalance = await getTokenBalance(
       client,
-      this.fourthAccount,
-      token4
+      this.accounts[4],
+      tokens[4]
     );
     assert.strictEqual(actualBalance, expectedHttBalance);
   }

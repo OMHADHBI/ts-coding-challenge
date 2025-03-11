@@ -24,8 +24,7 @@ import assert from "node:assert";
 
 interface World extends IWorldOptions {
   topicId?: TopicId;
-  firstAccountPrivateKey?: PrivateKey;
-  secondAccountPrivateKey?: PrivateKey;
+  privateKeys: (PrivateKey | undefined)[];
   thresholdKey?: KeyList;
 }
 
@@ -73,7 +72,7 @@ Given(
       client,
       expectedBalance * 2
     );
-    this.firstAccountPrivateKey = privateKey;
+    this.privateKeys[1] = privateKey;
     const query = new AccountBalanceQuery().setAccountId(accountId);
     const balance = await query.execute(client);
     const actualBalance = balance.hbars.toBigNumber().toNumber();
@@ -84,7 +83,7 @@ Given(
 When(
   /^A topic is created with the memo "([^"]*)" with the first account as the submit key$/,
   async function (memo: string) {
-    const publicKey = this.firstAccountPrivateKey.publicKey;
+    const publicKey = this.privateKeys[1].publicKey;
     this.topicId = await createTestTopic(client, memo, publicKey);
 
     //https://docs.hedera.com/hedera/sdks-and-apis/sdks/consensus-service/get-topic-info
@@ -134,7 +133,7 @@ Given(
       client,
       expectedBalance * 2
     );
-    this.secondAccountPrivateKey = privateKey;
+    this.privateKeys[2] = privateKey;
     const query = new AccountBalanceQuery().setAccountId(accountId);
     const balance = await query.execute(client);
     const actualBalance = balance.hbars.toBigNumber().toNumber();
@@ -149,10 +148,7 @@ Given(
       throw new Error(`Test requires exactly 2 keys, got ${totalKeys}`);
     }
     //https://docs.hedera.com/hedera/sdks-and-apis/sdks/keys/create-a-threshold-key
-    const keys = [
-      this.firstAccountPrivateKey.publicKey,
-      this.secondAccountPrivateKey.publicKey,
-    ];
+    const keys = [this.privateKeys[1].publicKey, this.privateKeys[2].publicKey];
     this.thresholdKey = new KeyList(keys, thresholdValue);
   }
 );
