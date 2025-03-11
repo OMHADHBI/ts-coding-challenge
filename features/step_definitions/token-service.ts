@@ -19,6 +19,7 @@ import {
   TokenId,
   TokenInfoQuery,
   TokenMintTransaction,
+  TransactionId,
   TransferTransaction,
 } from "@hashgraph/sdk";
 import assert from "node:assert";
@@ -433,31 +434,39 @@ When(
 );
 
 When(/^The first account submits the transaction$/, async function () {
-  const transferTxResponse = await this.signTransferTx.execute(client);
+  const signTransferTx = await this.signTransferTx.sign(
+    this.firstAccountPrivateKey
+  );
+  const transferTxResponse = await signTransferTx.execute(client);
   await transferTxResponse.getReceipt(client);
 });
 
 When(
   /^The second account creates a transaction to transfer (\d+) HTT tokens to the first account$/,
   async function (amountHtt) {
+    const txId = TransactionId.generate(this.firstAccount);
     const transferTx = await new TransferTransaction()
+      .setTransactionId(txId)
       .addTokenTransfer(token3, this.secondAccount, -amountHtt)
       .addTokenTransfer(token3, this.firstAccount, amountHtt)
       .freezeWith(client);
     this.signTransferTx = await transferTx.sign(this.secondAccountPrivateKey);
-    this.balanceHbarBeforeTransfer = await getHbarBalance(
+    this.firstAccountHbarBalanceBeforeTransfer = await getHbarBalance(
       client,
-      this.secondAccount
+      this.firstAccount
     );
   }
 );
 
 Then(/^The first account has paid for the transaction fee$/, async function () {
-  const balanceHbarAfterTransfer = await getHbarBalance(
+  const firstAccountHbarBalanceAfterTransfer = await getHbarBalance(
     client,
-    this.secondAccount
+    this.firstAccount
   );
-  assert.strictEqual(balanceHbarAfterTransfer, this.balanceHbarBeforeTransfer);
+  assert.ok(
+    firstAccountHbarBalanceAfterTransfer <
+      this.firstAccountHbarBalanceBeforeTransfer
+  );
 });
 
 Given(
